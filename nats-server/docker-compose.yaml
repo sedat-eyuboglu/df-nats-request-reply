@@ -1,0 +1,13 @@
+version: '3.9'
+services:
+  nats-server:
+    image: nats
+    command: ["-c", "/container/nats.conf"]
+    restart: always
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+      - "6222:6222"
+      - "7222:7222"
+    volumes:
+        - "./conf/:/container"
