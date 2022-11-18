@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>js nats reply client</title>
+    <style>
+        div#container{
+            margin-left: 20px;
+        }
+        ul#messages{
+            list-style-type: none;
+            margin: 0;
+            padding-left: 0;
+        }
+        button#stopPrinting{
+            margin-top: 20px;
+            width: 200px;
+            height: 35px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+<div id="container">
+    <h1>js nats reply client</h1>
+    <ul id="messages"></ul>
+    <button id="stopPrinting">Stop Printing Service</button>
+</div>
+<script>
+    function printReceipt(data){
+        return `The receipt requested was printed:${data.receiptId}`;
+    }
+</script>
+<script type="module">
+    import { connect, StringCodec } from './js/nats.js';
+    const sc = StringCodec();
+    try {
+        const nc = await connect( { servers: ["ws://localhost:7222"] });
+        document.getElementById("stopPrinting").onclick = async function() {
+            await nc.drain();
+        };
+        const sub = nc.subscribe("store.receipt.s101.*");
+        (async (sub) => {
+            console.log(`listening for ${sub.getSubject()} requests...`);
+
+            for await (const m of sub) {
+                const requestData = JSON.parse(sc.decode(m.data));
+                const printResult = printReceipt(requestData);
+                const replyData = sc.encode(JSON.stringify({ result: printResult }));
+                
+                if (m.respond(replyData)) {
+                    console.info(`Request handled #${sub.getProcessed()}`);
+                    const item = document.createElement("li");
+                    item.innerHTML = "&#128073;Reply was send for print request:"+requestData.receiptId;
+                    document.getElementById("messages").appendChild(item);
+                } else {
+                    console.log(`Request #${sub.getProcessed()} ignored - no reply subject`);
+                }
+            }
+
+            console.log(`subscription ${sub.getSubject()} drained.`);
+            alert("No more printing request accepting!");
+        })(sub);
+        
+        
+    } catch(err) {
+        console.log("error:"+err);
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>js nats request client</title>
+    <style>
+        div#container{
+            margin-left: 20px;
+        }
+        button#printButton{
+            margin-top: 20px;
+            width: 200px;
+            height: 35px;
+            font-weight: 600;
+        }
+        ul#messages{
+            list-style-type: none;
+            margin: 0;
+            padding-left: 0;
+        }
+    </style>
+</head>
+<body>
+<div id="container">
+    <h1>js nats request client</h1>
+    <ul id="messages"></ul>
+    <button id="printButton">Print Receipt</button>
+</div>
+<script type="module">
+    import { connect, StringCodec } from './js/nats.js';
+
+    document.getElementById("printButton").onclick = async function() {
+        await printRecepit();
+    };
+    
+    async function printRecepit() {
+        const sc = StringCodec();
+        try {
+            const nc = await connect( { servers: ["ws://localhost:7222"] });
+            const requestData = sc.encode(JSON.stringify({ storeId: 101, receiptId: new Date().toISOString() }));
+            
+            //waits for the response
+            const waitForReply = 8000;
+            await nc.request("store.receipt.s101.c001", requestData, { timeout: waitForReply }).then((m) => {
+                const replyData = JSON.parse(sc.decode(m.data));
+                console.log(`Got response: ${replyData.result}`);
+                const item = document.createElement("li");
+                item.innerHTML = "&#128073;"+replyData.result;
+                document.getElementById("messages").appendChild(item);
+            }).catch((err) => {
+                console.log(`Problem with request: ${err.message}`);
+            });
+            
+            //after response
+            console.log("Closing connection.");
+            await nc.close();
+        } catch(err) {
+            console.log("error connecting");
+        }
+    }
+</script>
+
+</body>
+</html>
